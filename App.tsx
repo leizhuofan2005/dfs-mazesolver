@@ -1,81 +1,53 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Bar } from './components/Bar';
 import { Controls } from './components/Controls';
+import { Minesweeper } from './components/Minesweeper';
+import { Sorting } from './components/Sorting';
+import { Sudoku } from './components/Sudoku';
 import { CellType, Grid } from './types';
-import { getDfsAnimations } from './algorithms/quickSort'; // Re-using file for DFS
+import { API_URL } from './src/config';
 
-const App: React.FC = () => {
+type TabType = 'maze' | 'minesweeper' | 'sorting' | 'sudoku';
+
+const MazeView: React.FC = () => {
   const [grid, setGrid] = useState<Grid>([]);
   const [gridSize, setGridSize] = useState<number>(25);
   const [speed, setSpeed] = useState<number>(50);
+  const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard' | 'extreme'>('hard');
   const [isSolving, setIsSolving] = useState<boolean>(false);
 
-  // 使用奇数大小的网格以获得更好的迷宫结构
   const effectiveGridSize = useMemo(() => (gridSize % 2 === 0 ? gridSize + 1 : gridSize), [gridSize]);
 
-  const START_NODE = useMemo(() => ({ row: 1, col: 1 }), []);
-  const END_NODE = useMemo(() => ({ row: effectiveGridSize - 2, col: effectiveGridSize - 2 }), [effectiveGridSize]);
+  const [startNode, setStartNode] = useState<{ row: number; col: number }>({ row: 1, col: 1 });
+  const [endNode, setEndNode] = useState<{ row: number; col: number }>({ row: effectiveGridSize - 2, col: effectiveGridSize - 2 });
 
   const isSolved = useMemo(() => {
     if (!grid.length) return false;
     return grid.flat().some(cell => cell === CellType.CorrectPath);
   }, [grid]);
 
-  const generateMaze = useCallback(() => {
-    // 1. 初始化一个填满墙壁的网格
-    const newGrid: Grid = Array.from({ length: effectiveGridSize }, () =>
-      Array(effectiveGridSize).fill(CellType.Wall)
-    );
+  const mapBackendGrid = (raw: number[][], start: {row: number; col: number}, goal: {row: number; col: number}): Grid => {
+    const g: Grid = raw.map(row => row.map(cell => (cell === 1 ? CellType.Wall : CellType.Path)));
+    g[start.row][start.col] = CellType.Start;
+    g[goal.row][goal.col] = CellType.End;
+    return g;
+  };
 
-    // 2. 使用随机深度优先搜索（递归回溯）算法来“雕刻”出一个完美的迷宫
-    const stack: { row: number; col: number }[] = [];
-    const startCell = { row: 1, col: 1 }; // 从一个角落开始雕刻
-
-    newGrid[startCell.row][startCell.col] = CellType.Path;
-    stack.push(startCell);
-
-    while (stack.length > 0) {
-      const current = stack[stack.length - 1]; // 查看栈顶元素
-
-      const neighbors = [];
-      // 检查距离为2的潜在邻居
-      const directions = [[-2, 0], [2, 0], [0, -2], [0, 2]];
-      directions.sort(() => Math.random() - 0.5); // 随机打乱方向
-
-      let foundNeighbor = false;
-      for (const [dr, dc] of directions) {
-        const neighborRow = current.row + dr;
-        const neighborCol = current.col + dc;
-
-        if (
-          neighborRow > 0 &&
-          neighborRow < effectiveGridSize - 1 &&
-          neighborCol > 0 &&
-          neighborCol < effectiveGridSize - 1 &&
-          newGrid[neighborRow][neighborCol] === CellType.Wall
-        ) {
-          // 移除中间的墙
-          newGrid[current.row + dr / 2][current.col + dc / 2] = CellType.Path;
-          // 将邻居设为路径
-          newGrid[neighborRow][neighborCol] = CellType.Path;
-          
-          stack.push({ row: neighborRow, col: neighborCol });
-          foundNeighbor = true;
-          break; // 移动到新的单元格
-        }
-      }
-
-      if (!foundNeighbor) {
-        stack.pop(); // 没有未访问的邻居，回溯
-      }
-    }
-
-    // 设置起点和终点
-    newGrid[START_NODE.row][START_NODE.col] = CellType.Start;
-    newGrid[END_NODE.row][END_NODE.col] = CellType.End;
-
-    setGrid(newGrid);
-  }, [effectiveGridSize, START_NODE, END_NODE]);
+  const generateMaze = useCallback(async () => {
+    // 生成新迷宫时，清除之前的搜索痕迹
+    setIsSolving(false);
+    const resp = await fetch(`${API_URL}/maze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ size: effectiveGridSize, difficulty })
+    });
+    const data = await resp.json();
+    const start = { row: data.start.row, col: data.start.col };
+    const goal = { row: data.goal.row, col: data.goal.col };
+    setStartNode(start);
+    setEndNode(goal);
+    setGrid(mapBackendGrid(data.grid, start, goal));
+  }, [effectiveGridSize, difficulty]);
 
   useEffect(() => {
     generateMaze();
@@ -94,47 +66,84 @@ const App: React.FC = () => {
     setGrid(newGrid);
   }, [grid, isSolving]);
 
-  const visualizeDfs = async () => {
-    if (isSolved || isSolving) return;
-
+  const visualizeBfs = async () => {
+    if (isSolved || isSolving || grid.length === 0) return;
     setIsSolving(true);
     
-    const animations = getDfsAnimations(grid, START_NODE, END_NODE);
+    // 将当前前端网格转换为后端格式
+    const backendGrid: number[][] = grid.map(row => 
+      row.map(cell => {
+        if (cell === CellType.Wall) return 1;
+        return 0;
+      })
+    );
+    
+    // 使用当前迷宫进行搜索，不重新生成
+    const resp = await fetch(`${API_URL}/solve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        grid: backendGrid,
+        start: startNode,
+        goal: endNode
+      })
+    });
+    const data = await resp.json();
+    const visited: {row: number; col: number}[] = data.visited;
+    const path: {row: number; col: number}[] = data.path;
     const delay = Math.floor(500 / (speed * 2));
 
-    for (const step of animations) {
+    // 重置网格，清除之前的搜索痕迹
+    const baseGrid = grid.map(row => row.map(cell => {
+      if (cell === CellType.Visited || cell === CellType.CorrectPath) {
+        return CellType.Path;
+      }
+      return cell;
+    }));
+    setGrid(baseGrid);
+
+    // 显示搜索过程
+    for (const v of visited) {
       await sleep(delay);
-      setGrid(prevGrid => {
-        const newGrid = prevGrid.map(row => [...row]);
-        newGrid[step.row][step.col] = step.type;
-        return newGrid;
+      setGrid(prev => {
+        const next = prev.map(row => [...row]);
+        const current = next[v.row][v.col];
+        if (current !== CellType.Start && current !== CellType.End && current !== CellType.Wall) {
+          next[v.row][v.col] = CellType.Visited;
+        }
+        return next;
       });
     }
-
+    
+    // 显示最终路径
+    for (const p of path) {
+      await sleep(delay);
+      setGrid(prev => {
+        const next = prev.map(row => [...row]);
+        const current = next[p.row][p.col];
+        if (current !== CellType.Start && current !== CellType.End && current !== CellType.Wall) {
+          next[p.row][p.col] = CellType.CorrectPath;
+        }
+        return next;
+      });
+    }
     setIsSolving(false);
   };
   
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center p-4 font-sans">
-      <header className="w-full max-w-7xl mb-4">
-        <h1 className="text-3xl md:text-4xl font-bold text-cyan-400 text-center tracking-wider">
-          深度优先搜索 (DFS) 迷宫寻路
-        </h1>
-        <p className="text-center text-gray-400 mt-2">
-            可视化算法如何通过探索（蓝色）和回溯来找到最优路径（黄色）。
-        </p>
-      </header>
-      
+    <>
       <Controls
         isSolving={isSolving}
         isSolved={isSolved}
         gridSize={gridSize}
         speed={speed}
+        difficulty={difficulty}
         onGenerateMaze={generateMaze}
-        onSolve={visualizeDfs}
+        onSolve={visualizeBfs}
         onResetPath={resetPath}
         onSizeChange={setGridSize}
         onSpeedChange={setSpeed}
+        onDifficultyChange={setDifficulty}
       />
 
       <div 
@@ -149,10 +158,148 @@ const App: React.FC = () => {
       </div>
 
       <footer className="mt-8 text-center text-gray-500 text-sm">
-        <p>
-            起点是绿色方块，终点是红色方块。
-        </p>
+        <p>起点是绿色方块，终点是红色方块。</p>
       </footer>
+    </>
+  );
+};
+
+const App: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<TabType>('maze');
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col items-center p-4 font-sans">
+      <header className="w-full max-w-7xl mb-4">
+        <h1 className="text-3xl md:text-4xl font-bold text-cyan-400 text-center tracking-wider">
+          算法游戏集合
+        </h1>
+        <p className="text-center text-gray-400 mt-2">
+          广度优先搜索迷宫寻路 & 扫雷游戏
+        </p>
+      </header>
+
+      {/* Tab Navigation */}
+      <div className="w-full max-w-4xl mb-6 flex gap-4 justify-center flex-wrap">
+        <button
+          onClick={() => setActiveTab('maze')}
+          className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+            activeTab === 'maze'
+              ? 'bg-cyan-600 text-white'
+              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+          }`}
+        >
+          迷宫寻路 (BFS)
+        </button>
+        <button
+          onClick={() => setActiveTab('minesweeper')}
+          className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+            activeTab === 'minesweeper'
+              ? 'bg-cyan-600 text-white'
+              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+          }`}
+        >
+          扫雷游戏
+        </button>
+        <button
+          onClick={() => setActiveTab('sorting')}
+          className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+            activeTab === 'sorting'
+              ? 'bg-cyan-600 text-white'
+              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+          }`}
+        >
+          排序算法
+        </button>
+        <button
+          onClick={() => setActiveTab('sudoku')}
+          className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+            activeTab === 'sudoku'
+              ? 'bg-cyan-600 text-white'
+              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+          }`}
+        >
+          数独游戏
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      <div className="w-full max-w-7xl">
+        {activeTab === 'maze' && (
+          <div className="flex flex-col items-center">
+            <h2 className="text-2xl font-bold text-cyan-400 mb-4">
+              广度优先搜索 (BFS) 迷宫寻路（后端计算）
+            </h2>
+            <p className="text-center text-gray-400 mb-4">
+              可视化算法如何通过探索（蓝色）和回溯来找到最优路径（黄色）。
+            </p>
+            <MazeView />
+          </div>
+        )}
+
+        {activeTab === 'minesweeper' && (
+          <div className="flex flex-col items-center">
+            <h2 className="text-2xl font-bold text-cyan-400 mb-4">
+              扫雷游戏（后端计算）
+            </h2>
+            <p className="text-center text-gray-400 mb-4">
+              经典的扫雷游戏，使用后端 Python 计算逻辑
+            </p>
+            <Minesweeper rows={16} cols={16} numMines={40} />
+          </div>
+        )}
+
+        {activeTab === 'sorting' && <SortingView />}
+
+        {activeTab === 'sudoku' && (
+          <div className="flex flex-col items-center">
+            <h2 className="text-2xl font-bold text-cyan-400 mb-4">
+              数独游戏（后端计算）
+            </h2>
+            <p className="text-center text-gray-400 mb-4">
+              经典数独游戏，使用后端 Python 生成和验证
+            </p>
+            <Sudoku />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const SortingView: React.FC = () => {
+  const [selectedAlgorithm, setSelectedAlgorithm] = useState<'bubble' | 'quick'>('bubble');
+
+  return (
+    <div className="flex flex-col items-center">
+      <h2 className="text-2xl font-bold text-cyan-400 mb-4">
+        排序算法可视化（后端计算）
+      </h2>
+      <p className="text-center text-gray-400 mb-4">
+        可视化冒泡排序和快速排序算法
+      </p>
+      <div className="w-full mb-4 flex gap-4 justify-center">
+        <button
+          onClick={() => setSelectedAlgorithm('bubble')}
+          className={`px-4 py-2 rounded-md transition-colors ${
+            selectedAlgorithm === 'bubble'
+              ? 'bg-cyan-600 text-white'
+              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+          }`}
+        >
+          冒泡排序
+        </button>
+        <button
+          onClick={() => setSelectedAlgorithm('quick')}
+          className={`px-4 py-2 rounded-md transition-colors ${
+            selectedAlgorithm === 'quick'
+              ? 'bg-cyan-600 text-white'
+              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+          }`}
+        >
+          快速排序
+        </button>
+      </div>
+      <Sorting algorithm={selectedAlgorithm} />
     </div>
   );
 };
