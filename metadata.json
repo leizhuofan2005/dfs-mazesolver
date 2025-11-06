@@ -1,0 +1,5 @@
+{
+  "name": "DFS Maze Solver",
+  "description": "一个用于可视化深度优先搜索（DFS）算法如何寻找迷宫路径的交互式 Web 应用程序。用户可以生成一个随机迷宫，并观察算法如何探索、回溯并最终找到从起点到终点的路径。 (An interactive web application to visualize how the Depth First Search (DFS) algorithm finds a path in a maze. Users can generate a random maze and watch the algorithm explore, backtrack, and find the solution.)",
+  "requestFramePermissions": []
+}
