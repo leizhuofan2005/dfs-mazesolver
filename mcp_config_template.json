@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "railway": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@jasontanswe/railway-mcp"
+      ],
+      "env": {
+        "RAILWAY_API_TOKEN": "请在这里粘贴你的Railway_API_Token"
+      }
+    }
+  }
+}
+

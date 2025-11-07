@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: algorithm-games
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: algorithm-games
+  template:
+    metadata:
+      labels:
+        app: algorithm-games
+    spec:
+      containers:
+      - name: algorithm-games
+        image: crpi-yvms4cndr4xq7550.cn-hangzhou.personal.cr.aliyuncs.com/algorithm-games/algorithm-games:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: ALLOWED_ORIGINS
+          value: "*"
+        - name: PORT
+          value: "8000"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: algorithm-games-service
+  namespace: default
+spec:
+  selector:
+    app: algorithm-games
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+  type: LoadBalancer
+

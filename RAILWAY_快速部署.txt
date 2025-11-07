@@ -1,0 +1,53 @@
+═══════════════════════════════════════════════════════════
+  Railway 快速部署步骤（已登录状态）
+═══════════════════════════════════════════════════════════
+
+【第一步：提交代码到 GitHub】
+1. 在项目目录运行：
+   git add .
+   git commit -m "准备部署到 Railway"
+   git push origin main
+
+【第二步：在 Railway 部署后端】
+
+1. 打开 https://railway.app/dashboard
+2. 点击 "New Project" → "Deploy from GitHub repo"
+3. 选择你的仓库：dfs-mazesolver
+4. Railway 会自动检测 Python 项目
+5. 在服务设置中配置：
+   - Build Command: pip install -r backend/requirements.txt
+   - Start Command: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+6. 等待部署完成
+7. 在 Settings → Networking 中生成域名
+8. 复制后端 URL（例如：https://xxx.railway.app）
+   ⚠️ 重要：保存这个 URL！
+
+【第三步：在 Railway 部署前端】
+
+1. 在同一个项目中，点击 "New" → "Service" → "GitHub Repo"
+2. 再次选择同一个仓库
+3. 在服务设置中配置：
+   - Build Command: npm install && npm run build
+   - Start Command: npx serve -s dist -l $PORT
+4. 在 Variables 中添加环境变量：
+   - Key: VITE_API_URL
+   - Value: 你的后端 URL（从第二步复制，不要加斜杠）
+5. 等待部署完成
+6. 在 Settings → Networking 中生成域名
+7. 复制前端 URL
+
+【第四步：配置 CORS】
+
+1. 回到后端服务
+2. 在 Variables 中添加：
+   - Key: ALLOWED_ORIGINS
+   - Value: 你的前端 URL（例如：https://xxx.railway.app）
+3. 保存后会自动重新部署
+
+【完成！】
+访问前端 URL 即可使用应用。
+
+═══════════════════════════════════════════════════════════
+  详细说明和故障排除请查看：RAILWAY_DEPLOY.md
+═══════════════════════════════════════════════════════════
+
