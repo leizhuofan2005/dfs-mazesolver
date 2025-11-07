@@ -1,4 +1,4 @@
-apiVersion: apps/v1
+﻿apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: algorithm-games
@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: algorithm-games
-        image: crpi-yvms4cndr4xq7550.cn-hangzhou.personal.cr.aliyuncs.com/algorithm-games/algorithm-games:latest
+        image: registry.cn-hangzhou.aliyuncs.com/algorithm-games/algorithm-games:latest
         ports:
         - containerPort: 8000
         env:

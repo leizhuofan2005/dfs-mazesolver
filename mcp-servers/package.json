@@ -1,0 +1,12 @@
+{
+  "name": "aliyun-mcp-server",
+  "version": "1.0.0",
+  "description": "阿里云 MCP 服务器",
+  "main": "aliyun-mcp-server.js",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0"
+  },
+  "bin": {
+    "aliyun-mcp-server": "./aliyun-mcp-server.js"
+  }
+}
