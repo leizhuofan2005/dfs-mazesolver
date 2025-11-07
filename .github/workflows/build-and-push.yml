@@ -17,7 +17,7 @@ jobs:
     - name: Login to Alibaba Cloud ACR
       uses: docker/login-action@v2
       with:
-        registry: crpi-yvms4cndr4xq7550.cn-hangzhou.personal.cr.aliyuncs.com
+        registry: registry.cn-hangzhou.aliyuncs.com
         username: ${{ secrets.ALIYUN_USERNAME }}
         password: ${{ secrets.ALIYUN_ACR_PASSWORD }}
     
@@ -26,5 +26,5 @@ jobs:
       with:
         context: .
         push: true
-        tags: crpi-yvms4cndr4xq7550.cn-hangzhou.personal.cr.aliyuncs.com/algorithm-games/algorithm-games:latest
+        tags: registry.cn-hangzhou.aliyuncs.com/algorithm-games/algorithm-games:latest
 
